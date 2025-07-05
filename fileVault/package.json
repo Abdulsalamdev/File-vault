@@ -1,0 +1,21 @@
+{
+  "name": "filevault",
+  "version": "1.0.0",
+  "description": "A simple CLI tool to manage file uploads locally with metadata",
+  "main": "./main.js",
+  "bin": {
+    "vault": "./main.js"
+  },
+  "scripts": {
+    "start": "node main.js"
+  },
+  "keywords": [],
+  "author": "Silent Architect",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "chalk": "^5.4.1",
+    "commander": "^14.0.0",
+    "uuid": "^11.1.0"
+  }
+}
