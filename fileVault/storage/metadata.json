@@ -1,37 +1,3 @@
 [
-  {
-    "id": "84861517-d013-4c90-adde-d677b4c47447",
-    "name": "test.txt",
-    "size": "12 B",
-    "path": "./storage/uploads/test.txt",
-    "uploadedAt": "2025-07-05T17:08:04.148Z"
-  },
-  {
-    "id": "399defe3-084b-4499-ba41-5f6a5c4e8d75",
-    "name": "text.txt",
-    "size": "6 B",
-    "path": "./storage/uploads/text.txt",
-    "uploadedAt": "2025-07-12T08:11:05.771Z"
-  },
-  {
-    "id": "2bf2fdf6-0aa5-4b25-a56f-2d54bc3c6433",
-    "name": "text.txt",
-    "size": "6 B",
-    "path": "./storage/uploads/text.txt",
-    "uploadedAt": "2025-07-12T08:14:46.616Z"
-  },
-  {
-    "id": "800f7ac1-a1a5-4884-b71e-1cf85886d59c",
-    "name": "text.txt",
-    "size": "6 B",
-    "path": "./storage/uploads/text.txt",
-    "uploadedAt": "2025-07-12T08:20:01.380Z"
-  },
-  {
-    "id": "6564d72f-e36b-4560-a811-f146ef8437a3",
-    "name": "text.txt",
-    "size": "6 B",
-    "path": "./storage/uploads/text.txt",
-    "uploadedAt": "2025-07-12T08:28:13.102Z"
-  }
+
 ]

@@ -3,13 +3,13 @@ module.exports = (program) => {
   // Define the list command
   program.command('list')
     .description('List all uploaded files')
-    .action(() => {
-      try {
-        FileService.list();
-        process.exit(0);
-      } catch (err) {
-        console.error(err.message);
-        process.exit(1);
-      }
-    });
+    .action(async () => {
+  try {
+    await FileService.list();  // ✅ await the list function
+  } catch (err) {
+    console.error("❌ Error:", err.message);
+  } finally {
+    process.exit(0); // Optional — wait for async calls to complete first
+  }
+});
 };

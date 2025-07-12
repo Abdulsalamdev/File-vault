@@ -8,18 +8,6 @@ const fs = require('fs');
 const path = require('path');
 const sessionPath = path.join(process.cwd(), '.session');
 
-function UserUuid() {
-  return (
-    "User-" +
-    Buffer.from(uuidv4().replace(/-/g, ""), "hex")
-      .toString("base64")
-      .replace(/\+/g, "")
-      .replace(/\//g, "")
-      .replace(/=/g, "")
-      .slice(0, 12)
-  );
-}
-
 const AuthService = {
   register: async () => {
     const email = readlineSync.question("Enter your email: ");
@@ -27,13 +15,13 @@ const AuthService = {
       hideEchoBack: true,
     });
 
-    const userId = UserUuid();
+    
     const user = await User.findOne({ email });
     if (user) throw new Error("User Already Exists");
 
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
-    const newUser = new User({ email, password: hashedPassword, id: userId });
+    const newUser = new User({ email, password: hashedPassword});
     await newUser.save();
   },
 
@@ -43,19 +31,31 @@ const AuthService = {
       hideEchoBack: true,
     });
 
+    // 1. Find the user by email
     const user = await User.findOne({ email });
-    if (!user) throw new Error("User not found");
+    if (!user) {
+      console.log(" User not found.");
+      return;
+    }
 
+    // 2. Compare passwords
     const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) throw new Error("Invalid password");
+    if (!isMatch) {
+      console.log("Invalid password.");
+      return;
+    }
 
-    const sessionToken = crypto.randomBytes(16).toString("hex");
-    fs.writeFileSync(sessionPath, sessionToken);
-    await redis.set(`session:${sessionToken}`, user._id.toString(), "EX", 60 * 60 * 24);
+    // 3. Generate a session token
+    const token = uuidv4();
 
-    console.log("✅ Login successful!");
-    console.log('Your session token:', sessionToken);
-    process.exit(0);
+    // 4. Save session in Redis
+    await redis.set(`session:${token}`, user._id.toString());
+
+    // 5. Save token locally in `.session`
+    fs.writeFileSync(sessionPath, token);
+
+    console.log("Login successful!");
+    console.log(`Your session token: ${token}`);
   },
 
   logout: async () => {
@@ -80,13 +80,13 @@ const AuthService = {
     const token = fs.readFileSync(sessionPath, 'utf-8');
     const userId = await redis.get(`session:${token}`);
     if (!userId) {
-      console.log("❌ Session expired or invalid.");
+      console.log(" Session expired or invalid.");
       return;
     }
 
     const user = await User.findById(userId);
     if (!user) {
-      console.log("❌ User not found.");
+      console.log(" User not found.");
       return;
     }
 

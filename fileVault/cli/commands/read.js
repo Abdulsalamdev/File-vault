@@ -4,9 +4,9 @@ module.exports = (program) => {
   // Define the read command
   program.command('read <file_id>')
     .description('Read file metadata')
-    .action((file_id) => {
+    .action(async (file_id) => {
       try {
-        FileService.read(file_id);
+        await FileService.read(file_id);
         process.exit(0);
       } catch (err) {
         console.error(err.message);

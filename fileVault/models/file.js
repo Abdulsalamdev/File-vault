@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 
 const fileSchema = new mongoose.Schema({
   id: String,
-  user_id: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+  user_id: String,
   name: String,
   path: String,
   size: String,
