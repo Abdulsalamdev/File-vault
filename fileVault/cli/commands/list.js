@@ -1,5 +1,6 @@
 const FileService = require('../../services/file_service');
 module.exports = (program) => {
+  // Define the list command
   program.command('list')
     .description('List all uploaded files')
     .action(() => {

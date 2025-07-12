@@ -1,5 +1,8 @@
 const FileService = require('../../services/file_service');
+
+
 module.exports = (program) => {
+  // Define the upload command
   program.command('upload <filepath>')
     .description('Upload a file')
     .action(async (filepath) => {

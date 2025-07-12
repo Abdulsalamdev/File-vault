@@ -1,5 +1,6 @@
 const FileService = require('../../services/file_service');
 module.exports = (program) => {
+  // Define the delete command
   program.command('delete <file_id>')
     .description('Delete a file')
     .action((file_id) => {
