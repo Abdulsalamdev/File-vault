@@ -2,87 +2,134 @@ const fs = require("fs");
 const path = require("path");
 const { v4: uuidv4 } = require("uuid");
 const { formatSize } = require("../utils/helpers");
+const { getAuthenticatedUser } = require("../utils/auth");
+const FileMetaData = require("../models/file");
 
-// metaData and Uplaod path Handler
-const METADATA_PATH = path.join(__dirname, "../storage/metadata.json");
+// Paths
 const UPLOAD_DIR = path.join(__dirname, "../storage/uploads");
 
-// Ensure the uploads folder and metadata file exist
+// Ensure the uploads folder exists
 if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
-if (!fs.existsSync(METADATA_PATH)) fs.writeFileSync(METADATA_PATH, "[]");
 
-//File Service Handler
 const FileService = {
   // Uploads a file and stores metadata
   upload: async (filepath) => {
-    if (!fs.existsSync(filepath)) throw new Error("File does not exist");
+    const userId = await getAuthenticatedUser();
+    if (!userId) throw new Error("❌ You must be logged in to upload a file.");
+
+    if (!fs.existsSync(filepath)) throw new Error("❌ File does not exist.");
+
     const stat = fs.statSync(filepath);
     const filename = path.basename(filepath);
     const ext = path.extname(filename).toLowerCase();
     const id = uuidv4();
     const dest = path.join(UPLOAD_DIR, filename);
 
-    //File Type validataion
+    // File type validation
     const BLOCKED_EXTENSIONS = [".exe", ".bat", ".cmd", ".sh"];
     if (BLOCKED_EXTENSIONS.includes(ext)) {
-      throw new Error(`File type "${ext}" is not allowed`);
+      throw new Error(`❌ File type "${ext}" is not allowed.`);
+    }
+
+    // Check for duplicate file name by same user
+    const exists = await FileMetaData.findOne({ name: filename, user_id: userId });
+    if (exists) {
+      throw new Error(`❌ A file named "${filename}" already exists.`);
     }
 
     // Copy file to uploads folder
     fs.copyFileSync(filepath, dest);
 
-    // Read existing metadata
-    const metadata = JSON.parse(fs.readFileSync(METADATA_PATH));
-
-    // Add new file's metadata
-    metadata.push({
+    // Save metadata to MongoDB
+    const newFile = new FileMetaData({
       id,
+      user_id: userId,
       name: filename,
+      path: dest,
       size: formatSize(stat.size),
-      path: `./storage/uploads/${filename}`,
-      uploadedAt: new Date().toISOString(),
     });
 
-    //Save updated metadata
-    fs.writeFileSync(METADATA_PATH, JSON.stringify(metadata, null, 2));
+    await newFile.save();
+
+    console.log("✅ File uploaded and saved to DB.");
     return id;
   },
 
-  // Lists all uploaded files
-  list: () => {
-    const metadata = JSON.parse(fs.readFileSync(METADATA_PATH));
-    console.log("ID         | Name       | Size   | Uploaded At");
-    console.log("-----------|------------|--------|--------------------------");
-    metadata.forEach((f) => {
-      console.log(
-        `${f.id.slice(0, 8)} | ${f.name.padEnd(10)} | ${f.size.padEnd(6)} | ${
-          f.uploadedAt
-        }`
-      );
+  // Lists all uploaded files for the current user
+list: async () => {
+  const userId = await getAuthenticatedUser();
+  console.log("🔐 Authenticated User ID:", userId);
+
+  if (!userId) {
+    console.log("❌ Please login to list your files.");
+    return;
+  }
+
+  const files = await FileMetaData.find({ user_id: userId }).sort({ created_at: -1 });
+  console.log("🧪 Files fetched from DB:", files); // ✅ NOW it's defined
+
+  if (!files.length) {
+    console.log("📭 No files uploaded yet.");
+    return;
+  }
+
+  console.log("ID         | Name       | Size   | Uploaded At");
+  console.log("-----------|------------|--------|--------------------------");
+
+  let totalSize = 0;
+
+  files.forEach((f) => {
+    console.log(
+      `${f.id.slice(0, 8)} | ${f.name.padEnd(10)} | ${f.size.padEnd(6)} | ${f.created_at.toISOString()}`
+    );
+
+    const sizeInBytes = parseFloat(f.size) * (f.size.includes("MB")
+      ? 1024 * 1024
+      : f.size.includes("KB")
+      ? 1024
+      : 1);
+    totalSize += sizeInBytes;
+  });
+
+  console.log(`\n📁 Total Files: ${files.length}`);
+  console.log(`📦 Total Size: ${formatSize(totalSize)}`);
+},
+
+  // Reads metadata of a file by its ID
+  read: async (id) => {
+    const userId = await getAuthenticatedUser();
+    if (!userId) throw new Error("❌ Please login to view your file.");
+
+    const file = await FileMetaData.findOne({
+      id: new RegExp(`^${id}`),
+      user_id: userId,
     });
+
+    if (!file) throw new Error("❌ File not found or you don't have permission.");
+
+    console.log(`📄 Filename: ${file.name}`);
+    console.log(`📏 Size: ${file.size}`);
+    console.log(`📁 Path: ${file.path}`);
+    console.log(`📅 Uploaded at: ${file.created_at.toISOString()}`);
   },
 
-  // Reads a file’s metadata by ID
-  read: (id) => {
-    const metadata = JSON.parse(fs.readFileSync(METADATA_PATH));
-    const file = metadata.find((f) => f.id.startsWith(id));
-    if (!file) throw new Error("File not found");
-    console.log(`Filename: ${file.name}`);
-    console.log(`Size: ${file.size}`);
-    console.log(`Path: ${file.path}`);
-    console.log(`Uploaded at: ${file.uploadedAt}`);
-  },
+  // Deletes a file by its ID
+  delete: async (id) => {
+    const userId = await getAuthenticatedUser();
+    if (!userId) throw new Error("❌ Please login to delete a file.");
 
-  // Delete a a file and its metadata
-  delete: (id) => {
-    const metadata = JSON.parse(fs.readFileSync(METADATA_PATH));
-    const index = metadata.findIndex((f) => f.id.startsWith(id));
-    if (index === -1) throw new Error("File not found");
-    const file = metadata[index];
-    const filePath = path.join(__dirname, "../", file.path);
-    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-    metadata.splice(index, 1);
-    fs.writeFileSync(METADATA_PATH, JSON.stringify(metadata, null, 2));
+    const file = await FileMetaData.findOne({
+      id: new RegExp(`^${id}`),
+      user_id: userId,
+    });
+
+    if (!file) throw new Error("❌ File not found or you don't have permission.");
+
+    if (fs.existsSync(file.path)) fs.unlinkSync(file.path);
+
+    await FileMetaData.deleteOne({ _id: file._id });
+
+    console.log(`🗑️ Deleted file: ${file.name} (${file.size})`);
   },
 };
 

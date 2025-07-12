@@ -7,8 +7,10 @@ module.exports = (program) => {
       try {
         FileService.delete(file_id);
         console.log('File deleted successfully!');
+        process.exit(0);
       } catch (err) {
         console.error(err.message);
+        process.exit(1);
       }
     });
 };

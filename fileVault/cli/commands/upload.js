@@ -9,8 +9,10 @@ module.exports = (program) => {
       try {
         const id = await FileService.upload(filepath);
         console.log(`File uploaded successfully! ID: ${id}`);
+        process.exit(0);
       } catch (err) {
         console.error(err.message);
+        process.exit(1);
       }
     });
 };
