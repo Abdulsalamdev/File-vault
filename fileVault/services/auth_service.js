@@ -53,7 +53,7 @@ const AuthService = {
     fs.writeFileSync(sessionPath, sessionToken);
     await redis.set(`session:${sessionToken}`, user._id.toString(), "EX", 60 * 60 * 24);
 
-    console.log("✅ Login successful!");
+    console.log(" Login successful!");
     console.log('Your session token:', sessionToken);
     process.exit(0);
   },
@@ -80,17 +80,17 @@ const AuthService = {
     const token = fs.readFileSync(sessionPath, 'utf-8');
     const userId = await redis.get(`session:${token}`);
     if (!userId) {
-      console.log("❌ Session expired or invalid.");
+      console.log(" Session expired or invalid.");
       return;
     }
 
     const user = await User.findById(userId);
     if (!user) {
-      console.log("❌ User not found.");
+      console.log(" User not found.");
       return;
     }
 
-    console.log("👤 Logged in as:", user.email);
+    console.log("Logged in as:", user.email);
   }
 };
 
