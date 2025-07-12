@@ -58,7 +58,7 @@ const FileService = {
 
 // Lists all uploaded files for the current user
 list: async () => {
-  const userId = await getAuthenticatedUser();
+    const userId = await getAuthenticatedUser();
     if (!userId) throw new Error("You must be logged in to upload a file.");
 
   const files = await FileMetaData.find({ user_id: userId }).sort({ created_at: -1 });
