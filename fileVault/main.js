@@ -5,7 +5,7 @@ const program = new Command();
 const commandRouter = require("./cli/command_router");
 
 require("dotenv").config(); // Load .env
-const connectDB = require("./db");
+const connectDB = require("./storage/db");
 
 (async () => {
   try {

@@ -3,14 +3,14 @@ const readlineSync = require("readline-sync");
 const { v4: uuidv4 } = require("uuid");
 const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
-const redis = require("../redis_client");
+const redis = require("../storage/redis_client");
 const fs = require('fs');
 const path = require('path');
 const sessionPath = path.join(process.cwd(), '.session');
 
 const AuthService = {
   register: async () => {
-    const email = readlineSync.question("Enter your email: ");
+    const email = readlineSync.question("nter your email: ");
     const password = readlineSync.question("Enter your password: ", {
       hideEchoBack: true,
     });

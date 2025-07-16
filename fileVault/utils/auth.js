@@ -1,6 +1,6 @@
 const fs = require("fs");
 const path = require("path");
-const redis = require("../redis_client");
+const redis = require("../storage/redis_client");
 
 const sessionPath = path.join(process.cwd(), ".session");
 
