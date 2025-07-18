@@ -1,18 +1,18 @@
-const FileService = require('../../services/file_service');
-
+// cli/commands/upload.js
+const FileService = require("../../services/file_service");
+const path = require("path");
 
 module.exports = (program) => {
-  // Define the upload command
-  program.command('upload <filepath>')
-    .description('Upload a file')
-    .action(async (filepath) => {
+  program
+    .command("upload <filePath> [parentId]")
+    .description("Upload a file (optionally to a folder)")
+    .action(async (filePath, parentId = null) => {
       try {
-        const id = await FileService.upload(filepath);
-        console.log(`File uploaded successfully! ID: ${id}`);
-        process.exit(0);
+        await FileService.upload(filePath, parentId);
       } catch (err) {
-        console.error(err.message);
-        process.exit(1);
+        console.error("🚨 Error:", err.message);
+      } finally {
+        process.exit(0);
       }
     });
 };
