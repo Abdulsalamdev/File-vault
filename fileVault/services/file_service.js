@@ -5,6 +5,7 @@ const { formatSize } = require("../utils/helpers");
 const { getAuthenticatedUser } = require("../utils/auth");
 const FileMetaData = require("../models/file");
 const mime = require("mime-types");
+const mongoose = require("mongoose");
 
 // Paths
 const UPLOAD_DIR = path.join(__dirname, "../storage/uploads");
@@ -14,71 +15,66 @@ if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
 const FileService = {
   // Uploads a file and stores metadata
-  upload: async (filePath, parentId = null) => {
+upload: async (filePath, parentId = null) => {
+    console.log("📥 Folder ID received:", parentId); // Debug log
+
     const userId = await getAuthenticatedUser();
-    if (!userId) throw new Error("Please login to upload a file");
+    if (!userId) throw new Error(" Please login to upload a file");
 
     if (!fs.existsSync(filePath)) {
-      throw new Error("File does not exist");
+      throw new Error(" File does not exist at path: " + filePath);
     }
 
-    const fileBuffer = fs.readFileSync(filePath);
     const stats = fs.statSync(filePath);
     const originalName = path.basename(filePath);
     const mimeType = mime.lookup(originalName) || "application/octet-stream";
+    const fileSize = stats.size;
 
-    const id = uuidv4(); // ✅ ADD THIS
-
-    const newFile = new FileMetaData({
-      id, // ✅ REQUIRED FIELD
+    const fileMetaData = new FileMetaData({
       name: originalName,
+      id: uuidv4(),
+      path: filePath,
       user_id: userId,
-      type: "file",
-      parent_id: parentId,
-      size: `${(stats.size / 1024).toFixed(1)} KB`,
+      parent_id: parentId || null,
+      size: fileSize,
       mime_type: mimeType,
-      content: fileBuffer,
+      visibility: "private", // default
+      type: "file",
     });
 
-    await newFile.save();
-    console.log(`📤 Uploaded: ${originalName}`);
+    await fileMetaData.save();
+    console.log(`📤 Uploaded: ${fileMetaData.name}`);
   },
+
   // Lists all uploaded files for the current user
-  list: async () => {
-    const userId = await getAuthenticatedUser();
-    if (!userId) throw new Error("You must be logged in to upload a file.");
+list: async () => {
+  const userId = await getAuthenticatedUser();
+  if (!userId) throw new Error("You must be logged in to view files.");
 
-    const files = await FileMetaData.find({ user_id: userId }).sort({
-      created_at: -1,
-    });
+  const files = await FileMetaData.find({ user_id: userId }).sort({
+    created_at: -1,
+  });
 
-    if (!files.length) {
-      console.log("📭 No files uploaded yet.");
-      return;
-    }
+  if (!files.length) {
+    console.log("📭 No files uploaded yet.");
+    return;
+  }
 
-    console.log("ID         | Name       | Size   | Uploaded At");
-    console.log("-----------|------------|--------|--------------------------");
+  console.log("ID         | Name       | Size   | Uploaded At");
+  console.log("-----------|------------|--------|--------------------------");
 
-    let totalSize = 0;
-    for (const f of files) {
-      console.log(
-        `${f.id.slice(0, 8)} | ${f.name.padEnd(10)} | ${f.size.padEnd(
-          6
-        )} | ${f.created_at.toISOString()}`
-      );
-      const numericSize = parseFloat(f.size);
-      const sizeInBytes = f.size.includes("MB")
-        ? numericSize * 1024 * 1024
-        : f.size.includes("KB")
-        ? numericSize * 1024
-        : numericSize;
-      totalSize += sizeInBytes;
-    }
+  let totalSize = 0;
+  for (const f of files) {
+    console.log(
+      `${f._id.toString().slice(0, 8)} | ${f.name.padEnd(10)} | ${f.size.toString().padEnd(6)} | ${f.created_at.toISOString()}`
+    );
 
-    console.log(`\n📦 Total Files: ${files.length}`);
-    console.log(`🧮 Total Size: ${formatSize(totalSize)}`);
-  },
+    totalSize += Number(f.size); // assuming it's stored in bytes
+  }
+
+  console.log(`\n📦 Total Files: ${files.length}`);
+  console.log(`🧮 Total Size: ${formatSize(totalSize)}`);
+},
   // Reads metadata of a file by its ID
   read: async (id) => {
     const userId = await getAuthenticatedUser();
@@ -116,8 +112,8 @@ const FileService = {
     console.log(`🗑️ Deleted file: ${file.name} (${file.size})`);
   },
 
-// create a folder directory
-mkdir: async (folderName, parentId = null) => {
+  // create a folder directory
+ mkdir: async (folderName, parentId = null) => {
   const userId = await getAuthenticatedUser();
   if (!userId) throw new Error("Please login to create a folder");
 
@@ -131,42 +127,84 @@ mkdir: async (folderName, parentId = null) => {
   });
 
   if (exists)
-    throw new Error(`Folder "${folderName}" already exists in this directory`);
+    throw new Error(
+      `Folder "${folderName}" already exists in this directory`
+    );
 
   const folder = new FileMetaData({
     id,
-    name: folderName, // ✅ add this!
+    name: folderName,
     user_id: userId,
     type: "folder",
     parent_id: parentId,
-    size: "0 B", // optional: folders don't have real size
+    size: 0, // ✅ Correct: number not string
   });
 
   await folder.save();
-  console.log(`📁 Folder created: ${folderName}`);
+  console.log(` Folder created: ${folderName}`);
 },
 
-
   // list all file and folder in the directory
-  ls: async (parentId = null) => {
-    const userId = await getAuthenticatedUser();
-    if (!userId) throw new Error("Please login to list files.");
+ls: async (parentId = null) => {
+  const userId = await getAuthenticatedUser();
+  if (!userId) {
+    console.log("❌ Please login to list files.");
+    return;
+  }
 
-    const files = await FileMetaData.find({
-      user_id: userId,
-      parent_id: parentId,
-    }).sort({ type: 1, name: 1 }); // folders first, then files alphabetically
+  const files = await FileMetaData.find({
+    user_id: userId,
+    parent_id: parentId,
+  }).sort({ created_at: -1 });
 
-    if (files.length === 0) {
-      console.log("📁 This folder is empty.");
-      return;
-    }
+  if (files.length === 0) {
+    console.log("📭 This folder is empty.");
+    return;
+  }
 
-    console.log(`📂 Contents of folder: ${parentId || 'root'}\n`);
-    files.forEach((file) => {
-      const icon = file.type === "folder" ? "📁" : "📄";
-      console.log(`${icon} ${file.name} (${file.type}) [${file._id}] - ${file.is_public ? "🌐 Public" : "🔒 Private"} - ${file.size || "0 B"}`);
-    });
+  console.log(` Contents of folder: ${parentId}\n`);
+ for (const file of files) {
+        const icon = file.type === 'folder' ? '📁' : file.type === 'image' ? '🖼️' : '📄';
+        const visibility = file.visibility === 'public' ? '🌐 Public' : '🔒 Private';
+        const fileId = file._id?.toString() || "❓";
+        const sizeLabel = file.type === 'folder' ? '-' : `${file.size} B`;
+
+        console.log(`${icon} ${file.name} (${file.type}) [${fileId}] - ${visibility} - ${sizeLabel}`);
+      }
+},
+  // Publish a file to make it public
+ publish: async (fileId) => {
+  const userId = await getAuthenticatedUser();
+  if (!userId) throw new Error("Please login first");
+
+  const file = await FileMetaData.findOne({
+    _id: new mongoose.Types.ObjectId(fileId),
+    user_id: userId,
+  });
+
+  if (!file) throw new Error("File not found or unauthorized");
+
+  file.visibility = "public";
+  await file.save();
+
+  console.log(`🌍 File "${file.name}" is now public`);
+},
+  // Unpublish a file to make it private
+   unpublish: async (fileId) => {
+     const userId = await getAuthenticatedUser();
+  if (!userId) throw new Error("Please login first");
+
+  const file = await FileMetaData.findOne({
+    _id: new mongoose.Types.ObjectId(fileId),
+    user_id: userId,
+  });
+
+  if (!file) throw new Error("File not found or unauthorized");
+
+  file.visibility = "private";
+  await file.save();
+
+  console.log(`🌍 File "${file.name}" is now private`);
   },
 };
 
