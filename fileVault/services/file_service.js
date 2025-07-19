@@ -50,13 +50,14 @@ const FileService = {
         type: mimeType.startsWith("image/") ? "image" : "file",
       });
 
-      await FileRepository.createFile(fileMetaData);
+       const saved = await FileRepository.createFile(fileMetaData);
       console.log(` Uploaded: ${originalName} (${formatSize(fileSize)})`);
+      console.log("File ID:", saved._id); 
 
       // Handle image thumbnails
-      if (fileMetaData.type === "image") {
-        await ThumbnailService.generate(id, newFilePath);
-      }
+        if (fileMetaData.type === "image") {
+      await ThumbnailService.generate(saved._id.toString(), newFilePath);
+    }
     } catch (err) {
       console.error(" Upload failed:", err.message);
     }
@@ -110,20 +111,19 @@ const FileService = {
   },
 
   // Deletes a file by its ID
-  delete: async (id) => {
-    // Ensure user is authenticated
-    const userId = await getAuthenticatedUser();
-    if (!userId) throw new Error(" Please login to delete a file.");
+delete: async (id) => {
+  const userId = await getAuthenticatedUser();
+  if (!userId) throw new Error("Please login to delete a file.");
 
-    // Retrieve file metadata from the repository
-    const file = await FileRepository.getFileById(id, userId);
-    if (!file) throw new Error(" File not found or you don't have permission.");
+  const file = await FileRepository.getFileById(id, userId);
+  if (!file) throw new Error("File not found or you don't have permission.");
 
-    if (fs.existsSync(file.path)) fs.unlinkSync(file.path);
+  if (fs.existsSync(file.path)) fs.unlinkSync(file.path);
 
-    await FileRepository.deleteFile(file._id);
-    console.log(` Deleted file: ${file.name} (${file.size})`);
-  },
+  const result = await FileRepository.deleteFile(file._id, userId);
+  console.log(`Deleted file: ${file.name} (${file.size})`);
+  console.log("🗑️ DB deletion result:", result);
+},
 
   // create a folder directory
   mkdir: async (folderName, parentId = null) => {

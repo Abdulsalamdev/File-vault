@@ -3,9 +3,9 @@ module.exports = (program) => {
   // Define the delete command
   program.command('delete <file_id>')
     .description('Delete a file')
-    .action((file_id) => {
+    .action(async (file_id) => {
       try {
-        FileService.delete(file_id);
+        await FileService.delete(file_id);
         console.log('File deleted successfully!');
         process.exit(0);
       } catch (err) {

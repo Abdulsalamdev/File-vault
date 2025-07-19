@@ -9,10 +9,8 @@ const FileRepository = {
   },
   // Retrieve a file by its ID and user ID
   async getFileById(id, userId) {
-    return await FileMetaData.findOne({
-      id: new RegExp(`^${id}`),
-      user_id: userId,
-    });
+    if (!mongoose.Types.ObjectId.isValid(id)) return null;
+     return await FileMetaData.findOne({ _id: id, user_id: userId });
   },
   // Retrieve a file by its MongoDB ID and user ID
   async getFileByMongoId(_id, userId) {
@@ -43,10 +41,10 @@ const FileRepository = {
       type: "folder",
     });
   },
-  // Update a file's metadata
-  async deleteFile(_id) {
-    return await FileMetaData.deleteOne({ _id });
-  },
+  // delete a file's metadata
+async deleteFile(_id) {
+  return await FileMetaData.deleteOne({ _id });
+},
   // Update a file's metadata
   async updateFileVisibility(_id, visibility) {
     return await FileMetaData.updateOne({ _id }, { $set: { visibility } });

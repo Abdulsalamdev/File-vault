@@ -10,7 +10,7 @@ module.exports = (program) => {
       try {
         await FileService.upload(filePath, parentId);
       } catch (err) {
-        console.error("🚨 Error:", err.message);
+        console.error("Error:", err.message);
       } finally {
         process.exit(0);
       }
