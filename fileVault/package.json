@@ -15,6 +15,7 @@
   "type": "commonjs",
   "dependencies": {
     "bcryptjs": "^3.0.2",
+    "bullmq": "^5.56.4",
     "chalk": "^5.4.1",
     "commander": "^14.0.0",
     "crypto": "^1.0.1",
@@ -24,6 +25,7 @@
     "mime-types": "^3.0.1",
     "mongoose": "^8.16.3",
     "readline-sync": "^1.4.10",
+    "sharp": "^0.34.3",
     "uuid": "^11.1.0"
   }
 }

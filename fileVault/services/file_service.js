@@ -6,6 +6,8 @@ const { getAuthenticatedUser } = require("../utils/auth");
 const FileMetaData = require("../models/file");
 const mime = require("mime-types");
 const mongoose = require("mongoose");
+const ThumbnailService = require("../services/thumbnail_service");
+
 
 // Paths
 const UPLOAD_DIR = path.join(__dirname, "../storage/uploads");
@@ -16,10 +18,10 @@ if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 const FileService = {
   // Uploads a file and stores metadata
 upload: async (filePath, parentId = null) => {
-    console.log("📥 Folder ID received:", parentId); // Debug log
-
+  try {
+    // Ensure user is authenticated
     const userId = await getAuthenticatedUser();
-    if (!userId) throw new Error(" Please login to upload a file");
+    if (!userId) throw new Error(" Please login to upload a file.");
 
     if (!fs.existsSync(filePath)) {
       throw new Error(" File does not exist at path: " + filePath);
@@ -30,21 +32,36 @@ upload: async (filePath, parentId = null) => {
     const mimeType = mime.lookup(originalName) || "application/octet-stream";
     const fileSize = stats.size;
 
+    const id = uuidv4();
+    const newFilePath = path.join(UPLOAD_DIR, `${id}_${originalName}`);
+
+    // Copy file to storage/uploads
+    fs.copyFileSync(filePath, newFilePath);
+
     const fileMetaData = new FileMetaData({
+      id,
       name: originalName,
-      id: uuidv4(),
-      path: filePath,
+      path: newFilePath,
       user_id: userId,
       parent_id: parentId || null,
       size: fileSize,
       mime_type: mimeType,
-      visibility: "private", // default
-      type: "file",
+      visibility: "private",
+      type: mimeType.startsWith("image/") ? "image" : "file",
     });
 
     await fileMetaData.save();
-    console.log(`📤 Uploaded: ${fileMetaData.name}`);
-  },
+    console.log(` Uploaded: ${originalName} (${formatSize(fileSize)})`);
+
+    // Handle image thumbnails
+    if (fileMetaData.type === "image") {
+      await ThumbnailService.generate(fileMetaData.id, newFilePath);
+    }
+
+  } catch (err) {
+    console.error(" Upload failed:", err.message);
+  }
+},
 
   // Lists all uploaded files for the current user
 list: async () => {
