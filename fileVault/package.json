@@ -7,7 +7,8 @@
     "vault": "./main.js"
   },
   "scripts": {
-    "start": "node main.js"
+   "dev:api": "nodemon api/server.js",
+  "start:cli": "node main.js"
   },
   "keywords": [],
   "author": "Silent Architect",
@@ -15,17 +16,23 @@
   "type": "commonjs",
   "dependencies": {
     "bcryptjs": "^3.0.2",
+    "body-parser": "^2.2.0",
     "bullmq": "^5.56.4",
     "chalk": "^5.4.1",
     "commander": "^14.0.0",
+    "cors": "^2.8.5",
     "crypto": "^1.0.1",
     "dotenv": "^17.2.0",
     "express": "^5.1.0",
     "ioredis": "^5.6.1",
     "mime-types": "^3.0.1",
     "mongoose": "^8.16.3",
+    "multer": "^2.0.2",
     "readline-sync": "^1.4.10",
     "sharp": "^0.34.3",
     "uuid": "^11.1.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.10"
   }
 }

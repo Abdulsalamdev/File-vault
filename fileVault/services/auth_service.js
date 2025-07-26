@@ -13,7 +13,7 @@ const SessionRepository = require("../repositories/session_repository");
 const AuthService = {
 
   register: async () => {
-    const email = readlineSync.question("nter your email: ");
+    const email = readlineSync.question("Enter your email: ");
     const password = readlineSync.question("Enter your password: ", {
       hideEchoBack: true,
     });
