@@ -12,6 +12,15 @@ const FileRepository = {
     if (!mongoose.Types.ObjectId.isValid(id)) return null;
      return await FileMetaData.findOne({ _id: id, user_id: userId });
   },
+  
+  // Get all publicly visible files (optionally within a specific parent folder)
+async getPublicFiles(parentId = null) {
+  return await FileMetaData.find({
+    visibility: "public",
+    parent_id: parentId,
+  }).sort({ created_at: -1 });
+},
+
   // Retrieve a file by its MongoDB ID and user ID
   async getFileByMongoId(_id, userId) {
     return await FileMetaData.findOne({

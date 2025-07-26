@@ -65,33 +65,51 @@ const FileService = {
 
   // Lists all uploaded files for the current user
   list: async () => {
-    // Ensure user is authenticated
-    const userId = await getAuthenticatedUser();
-    if (!userId) throw new Error("You must be logged in to view files.");
-    // Retrieve files from the repository
-    const files = await FileRepository.getFilesByUser(userId);
 
-    if (!files.length) {
-      console.log("📭 No files uploaded yet.");
-      return;
-    }
+    let userId = null;
+  try {
+    userId = await getAuthenticatedUser(); // attempt to get the logged-in user
+  } catch (err) {
+    // silent fail if no login
+  }
+  
 
-    console.log("ID         | Name       | Size   | Uploaded At");
-    console.log("-----------|------------|--------|--------------------------");
+  let userFiles = [];
+  if (userId) {
+    userFiles = await FileRepository.getFilesByUser(userId);
+  }
 
-    let totalSize = 0;
-    for (const f of files) {
-      console.log(
-        `${f._id.toString().slice(0, 8)} | ${f.name.padEnd(10)} | ${f.size
-          .toString()
-          .padEnd(6)} | ${f.created_at.toISOString()}`
-      );
+  const publicFiles = await FileRepository.getPublicFiles();
 
-      totalSize += Number(f.size); // assuming it's stored in bytes
-    }
+  // Merge and remove duplicates (in case a user’s own file is also public)
+  const fileMap = new Map();
 
-    console.log(`\n📦 Total Files: ${files.length}`);
-    console.log(` Total Size: ${formatSize(totalSize)}`);
+  for (const f of [...userFiles, ...publicFiles]) {
+    fileMap.set(f._id.toString(), f);
+  }
+
+  const files = Array.from(fileMap.values());
+
+  if (!files.length) {
+    console.log("📭 No files available.");
+    return;
+  }
+
+  console.log("ID         | Name       | Size   | Visibility | Uploaded At");
+  console.log("-----------|------------|--------|------------|--------------------------");
+
+  let totalSize = 0;
+  for (const f of files) {
+    console.log(
+      `${f._id.toString().slice(0, 8)} | ${f.name.padEnd(10)} | ${f.size
+        .toString()
+        .padEnd(6)} | ${f.visibility.padEnd(10)} | ${f.created_at.toISOString()}`
+    );
+    totalSize += Number(f.size);
+  }
+  
+  console.log(`\n📦 Total Files: ${files.length}`);
+  console.log(` Total Size: ${formatSize(totalSize)}`);
   },
   // Reads metadata of a file by its ID
   read: async (id) => {
