@@ -1,4 +1,3 @@
-// fileVault/api/routes/auth.routes.js
 const express = require("express");
 const AuthController = require("../controllers/auth_controller");
 const authMiddleware = require("../middleware/auth");
