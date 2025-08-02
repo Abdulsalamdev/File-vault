@@ -7,8 +7,8 @@
     "vault": "./main.js"
   },
   "scripts": {
-   "dev:api": "nodemon api/server.js",
-  "start:cli": "node main.js"
+    "dev:api": "nodemon api/server.js",
+    "start:cli": "node main.js"
   },
   "keywords": [],
   "author": "Silent Architect",
@@ -30,7 +30,8 @@
     "multer": "^2.0.2",
     "readline-sync": "^1.4.10",
     "sharp": "^0.34.3",
-    "uuid": "^11.1.0"
+    "uuid": "^11.1.0",
+    "winston": "^3.17.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.10"

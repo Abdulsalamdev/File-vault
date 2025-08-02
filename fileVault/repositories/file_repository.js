@@ -8,10 +8,12 @@ const FileRepository = {
     return await file.save();
   },
   // Retrieve a file by its ID and user ID
-  async getFileById(id, userId) {
-    if (!mongoose.Types.ObjectId.isValid(id)) return null;
-     return await FileMetaData.findOne({ _id: id, user_id: userId });
-  },
+async getFileById(id, userId) {
+  if (!mongoose.Types.ObjectId.isValid(id) || !mongoose.Types.ObjectId.isValid(userId)) {
+    return null;
+  }
+  return await FileMetaData.findOne({ _id: id, user_id: userId });
+},
   
   // Get all publicly visible files (optionally within a specific parent folder)
 async getPublicFiles(parentId = null) {

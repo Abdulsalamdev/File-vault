@@ -6,66 +6,94 @@ const ThumbnailService = require("../../services/thumbnail_service");
 const FileMetaData = require("../../models/file");
 const SessionRepository = require("../../repositories/session_repository");
 const UserRepository = require("../../repositories/user_repository");
+const logger = require("../../utils/logger");
+const ActivityLogger = require("../../services/activity_logger");
+const mongoose = require("mongoose");
 
 const UPLOAD_DIR = path.join(__dirname, "../storage/uploads");
 if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
 const FileController = {
-    // Upload a file or create a folder
-  async upload(req, res) {
-    try {
-      const { name, type, parentId } = req.body;
-      const userId = req.user._id;
+  // Upload a file or create a folder
+async upload(req, res) {
+  try {
+    const { name, type, parentId } = req.body;
+    const userId = req.user._id;
 
-      if (!name || !type)
-        return res.status(400).json({ error: "Missing name or type" });
+    if (!name || !type) {
+      ActivityLogger.log(userId, "UPLOAD_FAILED", {
+        reason: "Missing name or type",
+      });
+      return res.status(400).json({ error: "Missing name or type" });
+    }
 
-      // Handle folders
-      if (type === "folder") {
-        const exists = await FileRepository.folderExists(name, userId, parentId);
-        if (exists)
-          return res.status(409).json({ error: "Folder already exists" });
-
-        const folder = await FileRepository.createFile({
-          name,
-          type: "folder",
-          user_id: userId,
-          parent_id: parentId || null,
-          size: 0,
-        });
-
-        return res.status(201).json(folder);
+    // Handle folders
+    if (type === "folder") {
+      const exists = await FileRepository.folderExists(name, userId, parentId);
+      if (exists) {
+        ActivityLogger.log(userId, "FOLDER_ALREADY_EXISTS", { name });
+        return res.status(409).json({ error: "Folder already exists" });
       }
 
-      // Handle files
-      if (!req.file)
-        return res.status(400).json({ error: "Missing file data" });
-
-      const filePath = req.file.path;
-      const mimeType = mime.lookup(req.file.originalname) || "application/octet-stream";
-      const fileSize = fs.statSync(filePath).size;
-
-      const fileMeta = await FileRepository.createFile({
+      const folder = await FileRepository.createFile({
         name,
-        type: mimeType.startsWith("image/") ? "image" : "file",
-        path: filePath,
-        size: fileSize,
-        mime_type: mimeType,
+        type: "folder",
         user_id: userId,
         parent_id: parentId || null,
+        size: 0,
       });
 
-      if (fileMeta.type === "image") {
-        await ThumbnailService.generate(fileMeta._id.toString(), filePath);
-      }
+      ActivityLogger.log(userId, "CREATE_FOLDER", {
+        name,
+        parentId: parentId || null,
+      });
 
-      return res.status(201).json(fileMeta);
-    } catch (err) {
-      console.error("Upload error:", err);
-      return res.status(500).json({ error: "Internal server error" });
+      return res.status(201).json(folder);
     }
-  },
-// List files or folders
+
+    // Handle files
+    if (!req.file) {
+      ActivityLogger.log(userId, "UPLOAD_FAILED", {
+        reason: "Missing file data",
+        name,
+        parentId: parentId || null,
+      });
+      return res.status(400).json({ error: "Missing file data" });
+    }
+
+    const filePath = req.file.path;
+    const mimeType = mime.lookup(req.file.originalname) || "application/octet-stream";
+    const fileSize = fs.statSync(filePath).size;
+
+    const fileMeta = await FileRepository.createFile({
+      name,
+      type: mimeType.startsWith("image/") ? "image" : "file",
+      path: filePath,
+      size: fileSize,
+      mime_type: mimeType,
+      user_id: userId,
+      parent_id: parentId || null,
+    });
+
+    ActivityLogger.log(userId, "UPLOAD_FILE", {
+      filename: name,
+      fileType: mimeType,
+      fileSize,
+      parentId: parentId || null,
+    });
+
+    if (fileMeta.type === "image") {
+      await ThumbnailService.generate(fileMeta._id.toString(), filePath);
+    }
+
+    return res.status(201).json(fileMeta);
+  } catch (err) {
+    console.error("Upload error:", err);
+    ActivityLogger.error(req.user?._id || "guest", "UPLOAD_ERROR", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+},
+  // List files or folders
 async list(req, res) {
   try {
     const { parentId } = req.query;
@@ -78,49 +106,80 @@ async list(req, res) {
       if (userId) {
         const user = await UserRepository.findById(userId);
         if (user) {
-          req.user = user; // Optional: attach for downstream use
+          req.user = user;
         } else {
-          userId = null; // Fallback to public view
+          userId = null;
         }
       }
     }
 
     if (userId) {
-      // Logged-in → show user's files (private + public)
       const files = parentId
         ? await FileRepository.getFilesByParent(userId, parentId)
         : await FileRepository.getFilesByUser(userId);
+
+      ActivityLogger.log(userId, "LIST_FILES_AUTHENTICATED", {
+        parentId: parentId || null,
+        fileCount: files.length,
+      });
+
       return res.json(files);
     }
 
-    // Not logged in → only show public files
+    // Guest mode
     const publicFiles = await FileRepository.getPublicFiles(parentId || null);
+
+    ActivityLogger.log(null, "LIST_FILES_PUBLIC", {
+      parentId: parentId || null,
+      fileCount: publicFiles.length,
+    });
+
     return res.json(publicFiles);
   } catch (err) {
+    ActivityLogger.error(userId || "guest", "LIST_FILES_ERROR", err);
     console.error("List error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 },
 // Get file or folder metadata
-  async get(req, res) {
-    try {
-      const fileId = req.params.id;
-      const userId = req.user?._id;
+async get(req, res) {
+  try {
+    const fileId = req.params.id;
+    const userId = req.user?._id || null;
+    if (!mongoose.Types.ObjectId.isValid(fileId)) {
+  return res.status(400).json({ error: "Invalid file ID format" });
+}
 
-      let file = await FileRepository.getFileById(fileId, userId);
-      if (!file) {
-        file = await FileMetaData.findOne({ _id: fileId, visibility: "public" });
-      }
+    let file = await FileRepository.getFileById(fileId, userId);
 
-      if (!file) return res.status(404).json({ error: "File not found" });
-
-      res.json(file);
-    } catch (err) {
-      console.error("Get file error:", err);
-      res.status(500).json({ error: "Internal server error" });
+    if (!file) {
+      // Try to find public file
+      file = await FileMetaData.findOne({
+        _id: fileId,
+        visibility: "public",
+      });
     }
-  },
-// Serve file data
+
+    if (!file) {
+      ActivityLogger.log(userId, "GET_FILE_FAILED", { fileId });
+      return res.status(404).json({ error: "File not found" });
+    }
+
+    // Log file access
+    ActivityLogger.log(userId, "GET_FILE_SUCCESS", {
+      fileId: file._id.toString(),
+      fileName: file.name,
+      visibility: file.visibility,
+    });
+
+    res.json(file);
+  } catch (err) {
+    console.error("Get file error:", err);
+    ActivityLogger.error(req.user?._id, "GET_FILE_ERROR", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+},
+  // Serve file data
   async serveFile(req, res) {
     try {
       const file = await FileMetaData.findById(req.params.id);
@@ -130,7 +189,8 @@ async list(req, res) {
         return res.status(403).json({ error: "Access denied" });
       }
 
-      if (!fs.existsSync(file.path)) return res.status(404).json({ error: "File not found" });
+      if (!fs.existsSync(file.path))
+        return res.status(404).json({ error: "File not found" });
 
       res.setHeader("Content-Type", file.mime_type);
       fs.createReadStream(file.path).pipe(res);
@@ -139,11 +199,16 @@ async list(req, res) {
       res.status(500).json({ error: "Internal server error" });
     }
   },
-// Serve thumbnail
+  // Serve thumbnail
   async serveThumbnail(req, res) {
     try {
-      const thumbPath = path.join(__dirname, `../storage/thumbnails/${req.params.id}.jpg`);
-      if (!fs.existsSync(thumbPath)) return res.status(404).json({ error: "Thumbnail not found" });
+      const thumbPath = path.join(
+        __dirname,
+        `../storage/thumbnails/${req.params.id}.jpg`
+      );
+      if (!fs.existsSync(thumbPath))
+        return res.status(404).json({ error: "Thumbnail not found" });
+      
 
       res.setHeader("Content-Type", "image/jpeg");
       fs.createReadStream(thumbPath).pipe(res);
@@ -152,28 +217,43 @@ async list(req, res) {
       res.status(500).json({ error: "Internal server error" });
     }
   },
-// Publish a file
+  // Publish a file
   async publish(req, res) {
     return FileController.setVisibility(req, res, "public");
   },
-// Unpublish a file
+  // Unpublish a file
   async unpublish(req, res) {
     return FileController.setVisibility(req, res, "private");
   },
-// Set file visibility
-  async setVisibility(req, res, visibility) {
-    try {
-      const userId = req.user._id;
-      const file = await FileRepository.getFileByMongoId(req.params.id, userId);
-      if (!file) return res.status(404).json({ error: "File not found or unauthorized" });
+  // Set file visibility
+ async setVisibility(req, res, visibility) {
+  const fileId = req.params.id;
+  const userId = req.user?._id;
 
-      await FileRepository.updateFileVisibility(file._id, visibility);
-      res.json({ message: `File is now ${visibility}` });
-    } catch (err) {
-      console.error(`Set ${visibility} error:`, err);
-      res.status(500).json({ error: "Internal server error" });
+  try {
+    const file = await FileRepository.getFileById(fileId, userId);
+    if (!file) {
+      return res.status(404).json({ error: "File not found or unauthorized" });
     }
-  },
+
+    await FileRepository.updateFileVisibility(file._id, visibility);
+
+    // Log successful visibility change
+    ActivityLogger.log(userId, `${visibility.toUpperCase()}_FILE`, {
+      fileId: file._id,
+      filename: file.name,
+      visibility,
+    });
+
+    res.json({ message: `File is now ${visibility}` });
+
+  } catch (err) {
+    // Log any errors
+    ActivityLogger.error(userId, `${visibility.toUpperCase()}_FILE_ERROR`, err);
+    console.error(`Set ${visibility} error:`, err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+},
 };
 
 module.exports = FileController;

@@ -3,6 +3,9 @@ const bcrypt = require("bcryptjs");
 const { v4: uuidv4 } = require("uuid");
 const UserRepository = require("../../repositories/user_repository");
 const SessionRepository = require("../../repositories/session_repository");
+const logger = require("../../utils/logger");
+const ActivityLogger = require("../../services/activity_logger");
+
 
 const AuthController = {
   register: async (req, res) => {
@@ -42,7 +45,8 @@ const AuthController = {
   },
 
   login: async (req, res) => {
-    const { email, password } = req.body;
+    try{
+ const { email, password } = req.body;
     if (!email || !password)
       return res.status(400).json({ error: "Missing credentials" });
 
@@ -55,19 +59,31 @@ const AuthController = {
     const token = uuidv4();
     await SessionRepository.set(token, user._id.toString());
 
+    ActivityLogger.log(user._id, "LOGIN");
+
+
     res.json({
       message: "Login successful",
       token,
       userId: user._id,
       email: user.email,
     });
+    }
+    catch (error) {
+    ActivityLogger.error(null, "LOGIN_ERROR", error);
+      return res.status(500).json({ error: "Internal server error" });
+    }
   },
 
-  logout: async (req, res) => {
-    const token = req.token;
-    await SessionRepository.del(token);
-    res.json({ message: "Logged out successfully" });
-  },
+logout: async (req, res) => {
+  const token = req.token;
+  const user = req.user; // ✅ Add this line
+
+  await SessionRepository.del(token);
+ ActivityLogger.log(req.user?._id, "LOGOUT");
+
+  res.json({ message: "Logged out successfully" });
+},
 
   whoami: async (req, res) => {
     const user = req.user;
