@@ -4,6 +4,8 @@ const mime = require("mime-types");
 const FileRepository = require("../../repositories/file_repository");
 const ThumbnailService = require("../../services/thumbnail_service");
 const FileMetaData = require("../../models/file");
+const SessionRepository = require("../../repositories/session_repository");
+const UserRepository = require("../../repositories/user_repository");
 
 const UPLOAD_DIR = path.join(__dirname, "../storage/uploads");
 if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
@@ -64,21 +66,41 @@ const FileController = {
     }
   },
 // List files or folders
-  async list(req, res) {
-    try {
-      const userId = req.user._id;
-      const { parentId } = req.query;
+async list(req, res) {
+  try {
+    const { parentId } = req.query;
+    const token = req.headers["authorization"];
+    let userId = null;
 
+    if (token) {
+      // Try to resolve user from session
+      userId = await SessionRepository.get(token);
+      if (userId) {
+        const user = await UserRepository.findById(userId);
+        if (user) {
+          req.user = user; // Optional: attach for downstream use
+        } else {
+          userId = null; // Fallback to public view
+        }
+      }
+    }
+
+    if (userId) {
+      // Logged-in → show user's files (private + public)
       const files = parentId
         ? await FileRepository.getFilesByParent(userId, parentId)
         : await FileRepository.getFilesByUser(userId);
-
-      res.json(files);
-    } catch (err) {
-      console.error("List error:", err);
-      res.status(500).json({ error: "Internal server error" });
+      return res.json(files);
     }
-  },
+
+    // Not logged in → only show public files
+    const publicFiles = await FileRepository.getPublicFiles(parentId || null);
+    return res.json(publicFiles);
+  } catch (err) {
+    console.error("List error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+},
 // Get file or folder metadata
   async get(req, res) {
     try {

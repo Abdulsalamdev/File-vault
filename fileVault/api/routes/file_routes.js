@@ -10,7 +10,7 @@ const upload = multer({ dest: "api/storage/uploads/" });
 // Upload a file or create a folder
 router.post("/files", authMiddleware, upload.single("file"), FileController.upload);
 // get file or folder metadata
-router.get("/files", authMiddleware, FileController.list);
+router.get("/files", FileController.list);
 // list files in a folder
 router.get("/files/:id", FileController.get);
 
