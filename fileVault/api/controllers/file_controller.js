@@ -96,12 +96,11 @@ async upload(req, res) {
   // List files or folders
 async list(req, res) {
   try {
-    const { parentId } = req.query;
+    const { parentId, type, name, visibility, page = 1, limit = 10 } = req.query;
     const token = req.headers["authorization"];
     let userId = null;
 
     if (token) {
-      // Try to resolve user from session
       userId = await SessionRepository.get(token);
       if (userId) {
         const user = await UserRepository.findById(userId);
@@ -113,30 +112,54 @@ async list(req, res) {
       }
     }
 
+    const filters = {};
+    if (parentId && mongoose.Types.ObjectId.isValid(parentId)) {
+      filters.parent_id = parentId;
+    }
+    if (type) filters.type = type;
+    if (name) filters.name = new RegExp(name, "i"); // case-insensitive partial match
+    if (visibility) filters.visibility = visibility;
+
     if (userId) {
-      const files = parentId
-        ? await FileRepository.getFilesByParent(userId, parentId)
-        : await FileRepository.getFilesByUser(userId);
+      filters.user_id = userId;
+
+      const files = await FileMetaData.find(filters)
+        .sort({ created_at: -1 })
+        .skip((page - 1) * limit)
+        .limit(parseInt(limit));
+
+      const total = await FileMetaData.countDocuments(filters);
 
       ActivityLogger.log(userId, "LIST_FILES_AUTHENTICATED", {
         parentId: parentId || null,
+        filters,
         fileCount: files.length,
+        total,
       });
 
-      return res.json(files);
+      return res.json({ files, total, page: parseInt(page), limit: parseInt(limit) });
     }
 
-    // Guest mode
-    const publicFiles = await FileRepository.getPublicFiles(parentId || null);
+    // Guest mode (public files only)
+    filters.visibility = "public";
+    const publicFiles = await FileMetaData.find(filters)
+      .sort({ created_at: -1 })
+      .skip((page - 1) * limit)
+      .limit(parseInt(limit));
+    
+    const totalPublic = await FileMetaData.countDocuments(filters);
 
     ActivityLogger.log(null, "LIST_FILES_PUBLIC", {
       parentId: parentId || null,
+      filters,
       fileCount: publicFiles.length,
+      total: totalPublic,
     });
 
-    return res.json(publicFiles);
+    return res.json({ files: publicFiles, total: totalPublic, page: parseInt(page), limit: parseInt(limit) });
+
   } catch (err) {
-    ActivityLogger.error(userId || "guest", "LIST_FILES_ERROR", err);
+    ActivityLogger.error(req.user?._id || "guest", "LIST_FILES_ERROR", err);
     console.error("List error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
