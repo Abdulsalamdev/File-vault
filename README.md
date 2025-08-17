@@ -42,22 +42,51 @@ FileVault is a secure **file and folder management system** with both a **CLI in
 
 ```bash
 # Clone the repository
-git clone https://github.com/Abdulsalamdev/filevault.git
-cd filevault
+git clone https://github.com/Abdulsalamdev/File-vault.git
+cd fileVault
 
 # Install dependencies
 npm install
-# Register a new user
-node cli.js register --username fuad --password secret
 
-# Login
-node cli.js login --username fuad --password secret
+```
 
-# Create folder
-node cli.js mkdir documents
+---
+## 📂 Project Structure
+```bash
+filevault/
+├── cli/                 # CLI commands
+├── controllers/         # Express controllers
+├── middleware/          # Auth & validation middleware
+├── models/              # Mongoose models
+├── repositories/        # Repository pattern for DB
+├── routes/              # API routes
+├── services/            # Business logic services
+├── storage/             # File storage utilities
+├── utils/               # Helper functions
+├── workers/             # BullMQ workers
+├── cli.js               # CLI entry point
+├── server.js            # Express app entry point
+├── package.json
+└── README.md
 
-# List files/folders
-node cli.js ls
+```
+## 📖 API Endpoints
+Authentication
 
-# Upload file
-node cli.js upload ./resume.pdf --parent documents
+POST /api/auth/register → Register new user
+
+POST /api/auth/login → Login
+
+POST /api/auth/logout → Logout
+
+Files & Folders
+
+POST /api/files → Upload file
+
+GET /api/files → List files/folders
+
+GET /api/files/:id → Get file/folder details
+
+DELETE /api/files/:id → Delete file/folder
+
+
