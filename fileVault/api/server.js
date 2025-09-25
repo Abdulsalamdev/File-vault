@@ -4,7 +4,7 @@ const connectDB = require("../storage/db");
 const helmet = require("helmet");
 const fileRoutes = require('./routes/file_routes');
 const authRoutes = require("./routes/auth_routes"); 
-const cors = require("cors");
+const cors = require("cors"); 
 
 const app = express();
 app.use(express.json());
